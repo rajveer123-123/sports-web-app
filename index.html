@@ -1,0 +1,50 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+require('dotenv').config();
+
+const app = express();
+app.use(cors()); // Allows your mobile frontend to talk to this server
+app.use(express.json());
+
+// Athlete Schema
+const athleteSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    sport: { type: String, default: 'Athletics' },
+    event: String,
+    performanceHistory: [{ date: { type: Date, default: Date.now }, value: Number }],
+    personalBest: Number
+});
+
+const Athlete = mongoose.model('Athlete', athleteSchema);
+
+// GET: Load all athletes for the dashboard
+app.get('/api/athletes', async (req, res) => {
+    try {
+        const athletes = await Athlete.find();
+        res.json(athletes);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// POST: Save a new stopwatch time
+app.post('/api/athletes/:id/record', async (req, res) => {
+    const { value } = req.body;
+    const athlete = await Athlete.findById(req.params.id);
+    athlete.performanceHistory.push({ value });
+    
+    // Update Personal Best if the new time is lower (faster)
+    if (!athlete.personalBest || value < athlete.personalBest) {
+        athlete.personalBest = value;
+    }
+    await athlete.save();
+    res.json(athlete);
+});
+
+const PORT = process.env.PORT || 5000;
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("DB Connected"))
+    .catch(err => console.log(err));
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
